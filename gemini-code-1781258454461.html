@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大學預排課表系統</title>
+    <style>
+        :root {
+            --bg-required: #fff9db;    /* 淺黃 */
+            --bg-elective: #e7f5ff;    /* 淺藍 */
+            --bg-math: #ebfbee;        /* 淺綠 */
+            --bg-education: #fff4e6;   /* 淺橘 */
+            --bg-pe: #f1f3f5;          /* 淺灰 */
+            --text-color: #333;
+            --border-color: #dee2e6;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: var(--text-color);
+            padding: 20px;
+            margin: 0;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            text-align: center;
+            color: #2b2b2b;
+            margin-bottom: 20px;
+        }
+
+        .control-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+
+        .tabs-container {
+            display: flex;
+            gap: 10px;
+        }
+
+        .tab-btn {
+            background-color: #e9ecef;
+            color: #495057;
+            border: 1px solid #ced4da;
+            padding: 10px 20px;
+            font-size: 15px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .tab-btn.active {
+            background-color: #228be6;
+            color: white;
+            border-color: #228be6;
+        }
+
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+        }
+
+        .color-box {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        th, td {
+            border: 1px solid var(--border-color);
+            text-align: center;
+            padding: 6px;
+            font-size: 14px;
+            height: 70px;
+            vertical-align: middle;
+            word-break: break-all;
+        }
+
+        th { background-color: #e9ecef; font-weight: bold; }
+        th.total-credits-header { background-color: #343a40; color: #ffffff; font-size: 14px; }
+        td.time-label { background-color: #f1f3f5; font-weight: 500; width: 120px; }
+        td.course-slot { cursor: pointer; background-color: #ffffff; }
+        td.course-slot:hover { filter: brightness(0.95); border: 2px solid #228be6; }
+
+        /* 完美的格子內文字排版（符合圖二） */
+        .course-title-line { font-weight: bold; color: #000000; font-size: 14px; margin-bottom: 3px; }
+        .course-credit-label { font-size: 12px; color: #666666; font-weight: normal; display: block; margin-top: 1px; }
+        .course-teacher-line { font-size: 13px; color: #333333; }
+
+        .actions { margin-top: 20px; text-align: right; }
+        .btn-clear { background-color: #fa5252; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+
+        /* 彈出視窗樣式 */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            justify-content: center; align-items: center; z-index: 1000;
+        }
+
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 400px; }
+        .form-group { margin-bottom: 12px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; font-size: 14px; }
+        .form-group select, .form-group input { width: 100%; padding: 8px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+        .modal-buttons { display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px; }
+        .btn-submit { background-color: #228be6; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        .btn-cancel { background-color: #adb5bd; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+        .btn-delete { background-color: #e03131; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; margin-right: auto; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>大學預排課表系統</h1>
+    
+    <div class="control-panel">
+        <div class="tabs-container">
+            <button class="tab-btn active" onclick="switchTimetable(0)">課表一</button>
+            <button class="tab-btn" onclick="switchTimetable(1)">課表二</button>
+            <button class="tab-btn" onclick="switchTimetable(2)">課表三</button>
+        </div>
+    </div>
+
+    <div class="legend">
+        <div class="legend-item"><div class="color-box" style="background: var(--bg-required);"></div>系必修</div>
+        <div class="legend-item"><div class="color-box" style="background: var(--bg-elective);"></div>系選修</div>
+        <div class="legend-item"><div class="color-box" style="background: var(--bg-math);"></div>數學系</div>
+        <div class="legend-item"><div class="color-box" style="background: var(--bg-education);"></div>教程或其他</div>
+        <div class="legend-item"><div class="color-box" style="background: var(--bg-pe);"></div>體育</div>
+    </div>
+
+    <table id="timetable">
+        <thead>
+            <tr>
+                <th id="totalCreditsDisplay" class="total-credits-header">總學分：0</th>
+                <th>星期一</th>
+                <th>星期二</th>
+                <th>星期三</th>
+                <th>星期四</th>
+                <th>星期五</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <div class="actions">
+        <button class="btn-clear" onclick="clearTimetable()">清空當前課表</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="courseModal">
+    <div class="modal-content">
+        <h3 id="modalTitle">新增課程設定</h3>
+        <div class="form-group">
+            <label>1. 課程類別：</label>
+            <select id="popCategory">
+                <option value="1">系必修</option>
+                <option value="2">系選修</option>
+                <option value="3">數學系</option>
+                <option value="4">教程或其他</option>
+                <option value="5">體育</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>2. 連續上課節數：</label>
+            <input type="number" id="popHours" min="1" max="14" value="2">
+        </div>
+        <div class="form-group">
+            <label>3. 這門課算幾學分？</label>
+            <input type="number" id="popCredits" min="0" max="10" value="2">
+        </div>
+        <div class="form-group">
+            <label>4. 課程名稱：</label>
+            <input type="text" id="popName" placeholder="例如：高等微積分">
+        </div>
+        <div class="form-group">
+            <label>5. 授課老師：</label>
+            <input type="text" id="popTeacher" placeholder="例如：張教授">
+        </div>
+        <div class="modal-buttons">
+            <button class="btn-delete" id="btnDeleteCourse" onclick="deleteCurrentCourse()" style="display: none;">刪除此課程</button>
+            <button class="btn-cancel" onclick="closeModal()">取消</button>
+            <button class="btn-submit" onclick="submitCourseForm()">確定加入</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const periods = [
+        { id: "1", label: "第 1 節" }, { id: "2", label: "第 2 節" }, { id: "3", label: "第 3 節" },
+        { id: "4", label: "第 4 節" }, { id: "5", label: "第 5 節 (午休)" }, { id: "6", label: "第 6 節" },
+        { id: "7", label: "第 7 節" }, { id: "8", label: "第 8 節" }, { id: "9", label: "第 9 節" },
+        { id: "10", label: "第 10 節" }, { id: "A", label: "時段 A" }, { id: "B", label: "時段 B" },
+        { id: "C", label: "時段 C" }, { id: "D", label: "時段 D" }
+    ];
+
+    const categories = {
+        "1": { name: "系必修", color: "var(--bg-required)" },
+        "2": { name: "系選修", color: "var(--bg-elective)" },
+        "3": { name: "數學系", color: "var(--bg-math)" },
+        "4": { name: "教程或其他", color: "var(--bg-education)" },
+        "5": { name: "體育", color: "var(--bg-pe)" }
+    };
+
+    let currentTableIndex = 0;
+    let allSchedules = [
+        Array(5).fill(null).map(() => Array(periods.length).fill(null)),
+        Array(5).fill(null).map(() => Array(periods.length).fill(null)),
+        Array(5).fill(null).map(() => Array(periods.length).fill(null))
+    ];
+
+    let currentActiveDay = null;
+    let currentActivePIndex = null;
+    const tbody = document.querySelector("#timetable tbody");
+
+    // 初始化建構表格
+    periods.forEach((period, pIndex) => {
+        const row = document.createElement("tr");
+        const timeLabelTd = document.createElement("td");
+        timeLabelTd.className = "time-label";
+        timeLabelTd.innerText = period.label;
+        row.appendChild(timeLabelTd);
+
+        for (let day = 0; day < 5; day++) {
+            const cell = document.createElement("td");
+            cell.className = "course-slot";
+            cell.setAttribute("data-day", day.toString());
+            cell.setAttribute("data-pindex", pIndex.toString()); 
+            cell.onclick = function() { openModal(day, pIndex); };
+            row.appendChild(cell);
+        }
+        tbody.appendChild(row);
+    });
+
+    function switchTimetable(index) {
+        currentTableIndex = index;
+        const buttons = document.querySelectorAll(".tab-btn");
+        buttons.forEach((btn, i) => {
+            if (i === index) btn.classList.add("active");
+            else btn.classList.remove("active");
+        });
+        renderCurrentTableHTML();
+        calculateTotalCredits();
+    }
+
+    // 完美排版（對應圖二）
+    function renderCurrentTableHTML() {
+        const currentData = allSchedules[currentTableIndex];
+        for (let day = 0; day < 5; day++) {
+            for (let pIndex = 0; pIndex < periods.length; pIndex++) {
+                const cell = document.querySelector(`td[data-day="${day}"][data-pindex="${pIndex}"]`);
+                if (!cell) continue;
+
+                const course = currentData[day][pIndex];
+                if (course) {
+                    cell.style.backgroundColor = categories[course.catChoice].color;
+                    
+                    let startPIndex = pIndex;
+                    while (startPIndex > 0 && currentData[day][startPIndex - 1] && currentData[day][startPIndex - 1].id === course.id) {
+                        startPIndex--;
+                    }
+                    const relativeOffset = pIndex - startPIndex;
+                    
+                    if (relativeOffset === 0) {
+                        cell.innerHTML = `
+                            <div class="course-title-line">${course.name}</div>
+                            <span class="course-credit-label">(${course.credits} 學分)</span>
+                        `;
+                    } else if (relativeOffset === 1) {
+                        cell.innerHTML = `<div class="course-teacher-line">${course.teacher}</div>`;
+                    } else {
+                        cell.innerHTML = "";
+                    }
+                } else {
+                    cell.style.backgroundColor = "#ffffff";
+                    cell.innerHTML = "";
+                }
+            }
+        }
+    }
+
+    function openModal(day, pIndex) {
+        currentActiveDay = day;
+        currentActivePIndex = pIndex;
+        const existingCourse = allSchedules[currentTableIndex][day][pIndex];
+        const deleteBtn = document.getElementById("btnDeleteCourse");
+        const titleEl = document.getElementById("modalTitle");
+
+        if (existingCourse) {
+            titleEl.innerText = "修改 / 刪除課程";
+            deleteBtn.style.display = "block";
+            document.getElementById("popCategory").value = existingCourse.catChoice;
+            document.getElementById("popHours").value = existingCourse.hours;
+            document.getElementById("popCredits").value = existingCourse.credits;
+            document.getElementById("popName").value = existingCourse.name;
+            document.getElementById("popTeacher").value = existingCourse.teacher;
+        } else {
+            titleEl.innerText = "新增課程設定";
+            deleteBtn.style.display = "none";
+            document.getElementById("popCategory").value = "1";
+            document.getElementById("popHours").value = "2";
+            document.getElementById("popCredits").value = "2";
+            document.getElementById("popName").value = "";
+            document.getElementById("popTeacher").value = "";
+        }
+        document.getElementById("courseModal").style.display = "flex";
+    }
+
+    document.getElementById("courseModal").addEventListener("click", function(e) {
+        if(e.target === this) closeModal();
+    });
+
+    function closeModal() { document.getElementById("courseModal").style.display = "none"; }
+
+    function calculateTotalCredits() {
+        let total = 0;
+        const currentData = allSchedules[currentTableIndex];
+        for (let day = 0; day < 5; day++) {
+            for (let p = 0; p < periods.length; p++) {
+                const info = currentData[day][p];
+                if (info && info.isFirst) total += Number(info.credits);
+            }
+        }
+        document.getElementById("totalCreditsDisplay").innerText = `總學分：${total}`;
+    }
+
+    function submitCourseForm() {
+        const catChoice = document.getElementById("popCategory").value;
+        const hours = parseInt(document.getElementById("popHours").value, 10);
+        const credits = parseFloat(document.getElementById("popCredits").value);
+        const courseName = document.getElementById("popName").value.trim();
+        const teacherName = document.getElementById("popTeacher").value.trim();
+
+        if (isNaN(hours) || hours <= 0 || currentActivePIndex + hours > periods.length || !courseName || isNaN(credits)) {
+            alert("請填寫正確的設定與課程名稱！");
+            return;
+        }
+
+        if (allSchedules[currentTableIndex][currentActiveDay][currentActivePIndex]) {
+            clearSingleCourseLogic(currentActiveDay, currentActivePIndex);
+        }
+
+        const courseId = "_" + Math.random().toString(36).substr(2, 9);
+
+        for (let i = 0; i < hours; i++) {
+            allSchedules[currentTableIndex][currentActiveDay][currentActivePIndex + i] = {
+                id: courseId, name: courseName, teacher: teacherName, catChoice: catChoice, hours: hours, credits: credits, isFirst: (i === 0)
+            };
+        }
+        renderCurrentTableHTML();
+        calculateTotalCredits();
+        closeModal();
+    }
+
+    function deleteCurrentCourse() {
+        if (confirm("確定要刪除這門課程嗎？")) {
+            clearSingleCourseLogic(currentActiveDay, currentActivePIndex);
+            renderCurrentTableHTML();
+            calculateTotalCredits();
+            closeModal();
+        }
+    }
+
+    function clearSingleCourseLogic(day, pIndex) {
+        const currentData = allSchedules[currentTableIndex];
+        const targetCourse = currentData[day][pIndex];
+        if (!targetCourse) return;
+        const targetId = targetCourse.id;
+        for (let p = 0; p < periods.length; p++) {
+            if (currentData[day][p] && currentData[day][p].id === targetId) currentData[day][p] = null;
+        }
+    }
+
+    function clearTimetable() {
+        if (confirm("確定要清空當前分頁課表嗎？")) {
+            for (let p = 0; p < periods.length; p++) {
+                for (let d = 0; d < 5; d++) allSchedules[currentTableIndex][d][p] = null;
+            }
+            renderCurrentTableHTML();
+            calculateTotalCredits();
+        }
+    }
+</script>
+</body>
+</html>
